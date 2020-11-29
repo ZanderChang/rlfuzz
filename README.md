@@ -1,6 +1,6 @@
 # rlfuzz
 
-Inspired by [rlfuzz](https://github.com/spolu/rlfuzz)
+Inspired by [gym_fuzz1ng](https://github.com/spolu/gym_fuzz1ng)
 
 ## Installation
 
