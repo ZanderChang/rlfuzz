@@ -61,9 +61,16 @@ class FuzzBaseEnv(gym.Env):
         self.unique_path_history = [] # 记录发现的新路径数量（coverage_data不同）
         self.transition_count = [] # 记录每次input运行的EDGE数量
         # self.action_history = [] # 记录每次model计算的原始action值
+        self.virgin_count = [] # 记录edge访问数量的变化情况
 
         # 记录全局的edge访问
         self.virgin_map = np.array([255] * PATH_MAP_SIZE, dtype=np.uint8)
+
+        # 记录全局至少访问过一次的edge数量
+        self.virgin_single_count = 0
+
+        # 记录全局访问过的新edge的数量（每条edge触发的不同次数视作不同edge）
+        self.virgin_multi_count = 0
 
         # 从配置文件读取保存poc的地址
         self.POC_PATH = r'/tmp'
@@ -103,6 +110,8 @@ class FuzzBaseEnv(gym.Env):
         self.last_input_data = self._seed
         self.input_dict = {}
         self.virgin_map = np.array([255] * PATH_MAP_SIZE, dtype=np.uint8)
+        self.virgin_single_count = 0
+        self.virgin_multi_count = 0
 
         # 重置其它初始化信息
         self.input_maxsize = self._input_maxsize # 最大input大小
@@ -118,6 +127,7 @@ class FuzzBaseEnv(gym.Env):
         self.reward_history = [] # 记录训练全过程每一步的reward
         self.unique_path_history = [] # 记录发现的新路径数量（coverage_data不同）
         self.transition_count = [] # 记录每次input运行的EDGE数量
+        self.virgin_count = []
 
         assert len(self.last_input_data) <= self.input_maxsize
         return list(self.last_input_data) + [0] * (self.input_maxsize - len(self.last_input_data))
@@ -125,12 +135,16 @@ class FuzzBaseEnv(gym.Env):
     def actor2actual(self, output, scale):
         return int(output * np.ceil(scale/2) + np.ceil(scale/2)) % scale
 
+    # 每个位置被触发1、2、4、8、16、32、64、128次后该处记录归零，不再接受新纪录
     def updateVirginMap(self, covData):
         res = False
         for i in range(PATH_MAP_SIZE):
-            if covData[i] and covData[i] & self.virgin_map[i]:
+            if covData[i] and covData[i] & self.virgin_map[i]: # 该位置是否被触发固定次数
+                if self.virgin_map[i] == 255:
+                    self.virgin_single_count += 1 # 该位置首次被触发
                 res = True
                 self.virgin_map[i] &= ~(covData[i])
+                self.virgin_multi_count += 1 # 该位置被触发（最多记录8次）
         return res
 
     def step_raw(self, action):
@@ -185,6 +199,7 @@ class FuzzBaseEnv(gym.Env):
         else: # 从记录中随机选择待变异样本
             self.last_input_data = self.input_dict[random.choice(list(self.input_dict))]
 
+        self.virgin_count.append([self.virgin_single_count, self.virgin_multi_count]) # 
         self.unique_path_history.append(len(self.input_dict)) # 记录每一步之后发现的总的有效样本数
 
         # 记录每一步运行的EDGE数量

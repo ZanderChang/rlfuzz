@@ -55,3 +55,9 @@ register(
     id='FuzzWho-v0',
     entry_point='rlfuzz.envs:FuzzWhoEnv',
 )
+
+# user defined binary
+register(
+    id='UserDefined-v0',
+    entry_point='rlfuzz.envs:FuzzUserDefinedEnv',
+)
